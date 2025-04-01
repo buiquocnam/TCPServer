@@ -1,50 +1,41 @@
 package com.example.socket_server;
 
-import com.example.socket_server.exercises.NumberChecking;
-import com.example.socket_server.exercises.DigitOperations;
-import com.example.socket_server.exercises.GcdLcm;
-import com.example.socket_server.exercises.StringManipulation;
-
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.logging.Logger;
+import java.util.logging.Level;
 
 public class TCPServer {
-    private static final int PORT = Integer.parseInt(System.getenv().getOrDefault("PORT", "8080"));
+    private static final Logger LOGGER = Logger.getLogger(TCPServer.class.getName());
+    private static final int PORT = Integer.parseInt(System.getenv().getOrDefault("PORT", "10000"));
     private static final ExecutorService executorService = Executors.newCachedThreadPool();
 
     public static void main(String[] args) {
         try {
-            // In thông tin môi trường
-            System.out.println("Starting TCP Server...");
-            System.out.println("PORT: " + PORT);
-            System.out.println("JAVA_HOME: " + System.getenv("JAVA_HOME"));
-            System.out.println("PWD: " + System.getenv("PWD"));
+            LOGGER.info("Starting TCP Server...");
+            LOGGER.info("Server address: 0.0.0.0");
+            LOGGER.info("Server listening on port: " + PORT);
             
-            // Tạo server socket với backlog
-            ServerSocket serverSocket = new ServerSocket(PORT, 50);
-            System.out.println("Server socket created successfully");
-            System.out.println("Server listening on port: " + PORT);
-            System.out.println("Server address: " + serverSocket.getInetAddress().getHostAddress());
-
+            ServerSocket serverSocket = new ServerSocket(PORT);
+            LOGGER.info("Server socket created successfully");
+            
             while (true) {
                 try {
-                    System.out.println("Waiting for client connection...");
+                    LOGGER.info("Waiting for client connection...");
                     Socket clientSocket = serverSocket.accept();
-                    System.out.println("New client connected from: " + clientSocket.getInetAddress().getHostAddress());
+                    String clientAddress = clientSocket.getInetAddress().getHostAddress();
+                    LOGGER.info("New client connected from: " + clientAddress);
                     
                     executorService.execute(new ClientHandler(clientSocket));
                 } catch (IOException e) {
-                    System.err.println("Error accepting client connection: " + e.getMessage());
-                    e.printStackTrace();
+                    LOGGER.log(Level.SEVERE, "Error accepting client connection", e);
                 }
             }
         } catch (IOException e) {
-            System.err.println("Fatal server error: " + e.getMessage());
-            e.printStackTrace();
-            System.exit(1);
+            LOGGER.log(Level.SEVERE, "Server error", e);
         }
     }
 
@@ -57,72 +48,158 @@ public class TCPServer {
 
         @Override
         public void run() {
-            try (
-                BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-                PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true)
-            ) {
-                System.out.println("Client handler started for: " + clientSocket.getInetAddress().getHostAddress());
+            try {
+                LOGGER.info("Client handler started for: " + clientSocket.getInetAddress().getHostAddress());
                 
-                String inputLine;
-                while ((inputLine = in.readLine()) != null) {
-                    System.out.println("Received from client: " + inputLine);
-                    String response = processInput(inputLine);
-                    System.out.println("Sending response: " + response);
-                    out.println(response);
+                BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(clientSocket.getInputStream()));
+                PrintWriter writer = new PrintWriter(
+                    new OutputStreamWriter(clientSocket.getOutputStream()), true);
+
+                // Read the first line to determine if it's an HTTP request
+                String firstLine = reader.readLine();
+                if (firstLine == null) {
+                    LOGGER.warning("Received empty request");
+                    return;
                 }
+
+                // Check if it's an HTTP request
+                if (firstLine.startsWith("GET ") || firstLine.startsWith("HEAD ")) {
+                    // Handle HTTP health check
+                    handleHttpRequest(reader, writer);
+                } else {
+                    // Handle TCP message
+                    handleTcpMessage(firstLine, reader, writer);
+                }
+
+                clientSocket.close();
+                LOGGER.info("Client connection closed: " + clientSocket.getInetAddress().getHostAddress());
             } catch (IOException e) {
-                System.err.println("Error handling client: " + e.getMessage());
-                e.printStackTrace();
-            } finally {
-                try {
-                    clientSocket.close();
-                    System.out.println("Client connection closed: " + clientSocket.getInetAddress().getHostAddress());
-                } catch (IOException e) {
-                    System.err.println("Error closing client socket: " + e.getMessage());
-                    e.printStackTrace();
-                }
+                LOGGER.log(Level.SEVERE, "Error handling client: " + e.getMessage(), e);
             }
         }
 
-        private String processInput(String input) {
+        private void handleHttpRequest(BufferedReader reader, PrintWriter writer) throws IOException {
+            // Read all HTTP headers
+            String line;
+            while ((line = reader.readLine()) != null && !line.isEmpty()) {
+                LOGGER.info("Received from client: " + line);
+            }
+
+            // Send HTTP response for health check
+            writer.println("HTTP/1.1 200 OK");
+            writer.println("Content-Type: text/plain");
+            writer.println("Content-Length: 2");
+            writer.println();
+            writer.println("OK");
+            writer.flush();
+        }
+
+        private void handleTcpMessage(String firstLine, BufferedReader reader, PrintWriter writer) throws IOException {
+            LOGGER.info("Received from client: " + firstLine);
+            
+            // Process TCP message
+            String[] parts = firstLine.split("\\|");
+            if (parts.length != 2) {
+                String errorMsg = "Lỗi: Định dạng không hợp lệ. Sử dụng: function|data";
+                LOGGER.warning(errorMsg);
+                writer.println(errorMsg);
+                writer.flush();
+                return;
+            }
+
+            String function = parts[0];
+            String data = parts[1];
+            String response = processRequest(function, data);
+            
+            LOGGER.info("Sending response: " + response);
+            writer.println(response);
+            writer.flush();
+        }
+
+        private String processRequest(String function, String data) {
+            switch (function) {
+                case "login":
+                    return handleLogin(data);
+                case "register":
+                    return handleRegister(data);
+                case "getUserInfo":
+                    return handleGetUserInfo(data);
+                case "updateUserInfo":
+                    return handleUpdateUserInfo(data);
+                case "getAllUsers":
+                    return handleGetAllUsers();
+                case "deleteUser":
+                    return handleDeleteUser(data);
+                default:
+                    return "Lỗi: Chức năng không tồn tại";
+            }
+        }
+
+        private String handleLogin(String data) {
             try {
-                String[] parts = input.split("\\|");
-                if (parts.length < 2) {
-                    return "Lỗi: Định dạng không hợp lệ. Sử dụng: function|data";
+                String[] parts = data.split(",");
+                if (parts.length != 2) {
+                    return "Lỗi: Định dạng dữ liệu không hợp lệ";
                 }
+                String username = parts[0];
+                String password = parts[1];
+                
+                // TODO: Implement actual login logic
+                return "Đăng nhập thành công";
+            } catch (Exception e) {
+                return "Lỗi: " + e.getMessage();
+            }
+        }
 
-                int function = Integer.parseInt(parts[0]);
-                String data = parts[1];
-
-                switch (function) {
-                    case 1: {
-                        int number = Integer.parseInt(data);
-                        return NumberChecking.checkNumber(number);
-                    }
-                    case 2: {
-                        int number = Integer.parseInt(data);
-                        return DigitOperations.calculateDigits(number);
-                    }
-                    case 3: {
-                        String[] numbers = data.split("\\s+");
-                        if (numbers.length != 2) {
-                            return "Lỗi: Vui lòng nhập đúng hai số nguyên, cách nhau bởi dấu cách!";
-                        }
-                        int a = Integer.parseInt(numbers[0]);
-                        int b = Integer.parseInt(numbers[1]);
-                        return GcdLcm.calculate(a, b);
-                    }
-                    case 4:
-                        return StringManipulation.reverseString(data);
-                    case 5:
-                        return StringManipulation.AdvancedOperations.processString(data);
-                    case 6:
-                        return StringManipulation.Analysis.analyzeString(data);
-                    default:
-                        return "Lỗi: Chức năng không tồn tại!";
+        private String handleRegister(String data) {
+            try {
+                String[] parts = data.split(",");
+                if (parts.length != 3) {
+                    return "Lỗi: Định dạng dữ liệu không hợp lệ";
                 }
-            } catch (NumberFormatException e) {
-                return "Lỗi: Dữ liệu không hợp lệ!";
+                String username = parts[0];
+                String password = parts[1];
+                String email = parts[2];
+                
+                // TODO: Implement actual registration logic
+                return "Đăng ký thành công";
+            } catch (Exception e) {
+                return "Lỗi: " + e.getMessage();
+            }
+        }
+
+        private String handleGetUserInfo(String data) {
+            try {
+                // TODO: Implement actual user info retrieval logic
+                return "Thông tin người dùng";
+            } catch (Exception e) {
+                return "Lỗi: " + e.getMessage();
+            }
+        }
+
+        private String handleUpdateUserInfo(String data) {
+            try {
+                // TODO: Implement actual user info update logic
+                return "Cập nhật thông tin thành công";
+            } catch (Exception e) {
+                return "Lỗi: " + e.getMessage();
+            }
+        }
+
+        private String handleGetAllUsers() {
+            try {
+                // TODO: Implement actual user list retrieval logic
+                return "Danh sách người dùng";
+            } catch (Exception e) {
+                return "Lỗi: " + e.getMessage();
+            }
+        }
+
+        private String handleDeleteUser(String data) {
+            try {
+                // TODO: Implement actual user deletion logic
+                return "Xóa người dùng thành công";
             } catch (Exception e) {
                 return "Lỗi: " + e.getMessage();
             }
