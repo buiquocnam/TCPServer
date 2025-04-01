@@ -7,7 +7,7 @@ import java.util.Scanner;
 public class TCPClient {
     private static final String SERVER_HOST = "tcpserver-adpb.onrender.com";
     private static final int SERVER_PORT = 10000;
-    private static final int TIMEOUT = 10000; // 10 seconds timeout
+    private static final int TIMEOUT = 30000; // Increased timeout to 30 seconds
 
     public static void main(String[] args) {
         Socket socket = null;
@@ -34,13 +34,24 @@ public class TCPClient {
             writer = new PrintWriter(new OutputStreamWriter(socket.getOutputStream()), true);
             scanner = new Scanner(System.in);
 
-            // Đọc menu từ server
-            String menu = reader.readLine();
-            if (menu == null || menu.trim().isEmpty()) {
-                System.out.println("Không nhận được menu từ server. Đang thoát...");
+            // Đọc thông điệp chào mừng và menu từ server
+            String welcome = reader.readLine();
+            if (welcome == null || welcome.trim().isEmpty()) {
+                System.out.println("Không nhận được phản hồi từ server. Đang thoát...");
                 return;
             }
-            System.out.println(menu);
+            System.out.println(welcome);
+
+            // Đọc dòng trống
+            reader.readLine();
+
+            // Đọc menu
+            StringBuilder menu = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null && !line.trim().isEmpty()) {
+                menu.append(line).append("\n");
+            }
+            System.out.println(menu.toString());
 
             // Vòng lặp chính để tương tác với server
             while (true) {
@@ -66,7 +77,6 @@ public class TCPClient {
 
                     // Đọc kết quả từ server
                     StringBuilder result = new StringBuilder();
-                    String line;
                     while ((line = reader.readLine()) != null && !line.trim().isEmpty()) {
                         result.append(line).append("\n");
                     }
@@ -75,13 +85,17 @@ public class TCPClient {
                     }
 
                     // Đọc menu tiếp theo
-                    menu = reader.readLine();
-                    if (menu == null || menu.trim().isEmpty()) {
-                        System.out.println("Server đã đóng kết nối.");
-                        break;
+                    menu = new StringBuilder();
+                    while ((line = reader.readLine()) != null && !line.trim().isEmpty()) {
+                        menu.append(line).append("\n");
                     }
-                    System.out.println(menu);
+                    if (menu.length() > 0) {
+                        System.out.println(menu.toString());
+                    }
 
+                } catch (java.net.SocketTimeoutException e) {
+                    System.out.println("Lỗi: Kết nối bị timeout. Vui lòng thử lại.");
+                    break;
                 } catch (IOException e) {
                     System.out.println("Lỗi kết nối: " + e.getMessage());
                     break;
@@ -89,15 +103,21 @@ public class TCPClient {
             }
 
         } catch (java.net.SocketTimeoutException e) {
-            System.out.println("Lỗi: Kết nối bị timeout sau " + TIMEOUT + " giây");
+            System.out.println("Lỗi: Kết nối bị timeout sau " + TIMEOUT/1000 + " giây");
+            System.out.println("Chi tiết lỗi:");
             e.printStackTrace();
+            System.out.println("\nGợi ý khắc phục:");
+            System.out.println("1. Kiểm tra service có đang chạy trên Render không");
+            System.out.println("2. Kiểm tra cấu hình port trên Render (phải là 10000)");
+            System.out.println("3. Thử tắt tạm thời firewall");
+            System.out.println("4. Kiểm tra logs của service trên Render");
         } catch (IOException e) {
             System.out.println("Lỗi kết nối: " + e.getMessage());
             System.out.println("Chi tiết lỗi:");
             e.printStackTrace();
             System.out.println("\nGợi ý khắc phục:");
             System.out.println("1. Kiểm tra service có đang chạy trên Render không");
-            System.out.println("2. Kiểm tra cấu hình port trên Render");
+            System.out.println("2. Kiểm tra cấu hình port trên Render (phải là 10000)");
             System.out.println("3. Thử tắt tạm thời firewall");
             System.out.println("4. Kiểm tra logs của service trên Render");
         } finally {

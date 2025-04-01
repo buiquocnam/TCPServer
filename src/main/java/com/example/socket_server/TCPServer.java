@@ -66,6 +66,12 @@ public class TCPServer {
                 PrintWriter writer = new PrintWriter(
                     new OutputStreamWriter(clientSocket.getOutputStream()), true);
 
+                // Send welcome message and menu immediately
+                writer.println("Chào mừng đến với TCP Server!");
+                writer.println();
+                sendMenu(writer);
+                writer.flush();
+
                 // Read the first line
                 String firstLine = reader.readLine();
                 if (firstLine == null || firstLine.trim().isEmpty()) {
@@ -141,8 +147,6 @@ public class TCPServer {
             
             try {
                 int currentFunction = 0;
-                sendMenu(writer);
-
                 String line = firstLine;
                 while (line != null && !line.trim().isEmpty()) {
                     try {
