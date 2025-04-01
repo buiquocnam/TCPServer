@@ -18,15 +18,11 @@ FROM openjdk:17-slim
 
 WORKDIR /app
 
-# Copy the built JAR file
+# Copy the built jar from the build stage
 COPY --from=build /app/target/socket-server-0.0.1-SNAPSHOT.jar app.jar
 
 # Set environment variables
-ENV PORT=8080
 ENV JAVA_OPTS="-Xmx512m -Xms256m"
 
-# Expose the port
-EXPOSE 8080
-
-# Run the application with proper signal handling
-CMD ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
+# Run the application
+CMD ["java", "-jar", "app.jar"]

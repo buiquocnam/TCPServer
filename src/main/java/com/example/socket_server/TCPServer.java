@@ -15,7 +15,7 @@ import java.util.logging.Level;
 
 public class TCPServer {
     private static final Logger LOGGER = Logger.getLogger(TCPServer.class.getName());
-    private static final int PORT = Integer.parseInt(System.getenv().getOrDefault("PORT", "10000"));
+    private static final int PORT = Integer.parseInt(System.getenv().getOrDefault("PORT", "8080"));
     private static final ExecutorService executorService = Executors.newCachedThreadPool();
     private static final int MAX_EMPTY_REQUESTS = 3;
     private static int emptyRequestCount = 0;
@@ -71,8 +71,10 @@ public class TCPServer {
         public void run() {
             BufferedReader reader = null;
             PrintWriter writer = null;
+            String clientAddress = null;
+            
             try {
-                String clientAddress = clientSocket.getInetAddress().getHostAddress();
+                clientAddress = clientSocket.getInetAddress().getHostAddress();
                 
                 reader = new BufferedReader(
                     new InputStreamReader(clientSocket.getInputStream()));
@@ -126,7 +128,7 @@ public class TCPServer {
                     if (reader != null) reader.close();
                     if (!clientSocket.isClosed()) {
                         clientSocket.close();
-                        if (!clientAddress.startsWith("10.209.")) {
+                        if (clientAddress != null && !clientAddress.startsWith("10.209.")) {
                             LOGGER.info("Client connection closed: " + clientAddress);
                         }
                     }
