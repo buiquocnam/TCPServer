@@ -36,6 +36,10 @@ public class TCPClient {
 
             // Đọc menu từ server
             String menu = reader.readLine();
+            if (menu == null || menu.trim().isEmpty()) {
+                System.out.println("Không nhận được menu từ server. Đang thoát...");
+                return;
+            }
             System.out.println(menu);
 
             // Vòng lặp chính để tương tác với server
@@ -61,12 +65,14 @@ public class TCPClient {
                     writer.flush();
 
                     // Đọc kết quả từ server
-                    String result = reader.readLine();
-                    if (result == null || result.trim().isEmpty()) {
-                        System.out.println("Server đã đóng kết nối.");
-                        break;
+                    StringBuilder result = new StringBuilder();
+                    String line;
+                    while ((line = reader.readLine()) != null && !line.trim().isEmpty()) {
+                        result.append(line).append("\n");
                     }
-                    System.out.println(result);
+                    if (result.length() > 0) {
+                        System.out.println(result.toString());
+                    }
 
                     // Đọc menu tiếp theo
                     menu = reader.readLine();

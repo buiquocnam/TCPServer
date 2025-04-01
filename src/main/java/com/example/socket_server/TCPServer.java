@@ -17,6 +17,8 @@ public class TCPServer {
     private static final Logger LOGGER = Logger.getLogger(TCPServer.class.getName());
     private static final int PORT = Integer.parseInt(System.getenv().getOrDefault("PORT", "10000"));
     private static final ExecutorService executorService = Executors.newCachedThreadPool();
+    private static final int MAX_EMPTY_REQUESTS = 3;
+    private static int emptyRequestCount = 0;
 
     public static void main(String[] args) {
         try {
@@ -29,10 +31,13 @@ public class TCPServer {
             
             while (true) {
                 try {
-                    LOGGER.info("Waiting for client connection...");
                     Socket clientSocket = serverSocket.accept();
                     String clientAddress = clientSocket.getInetAddress().getHostAddress();
-                    LOGGER.info("New client connected from: " + clientAddress);
+                    
+                    // Only log new connections from non-Render IPs
+                    if (!clientAddress.startsWith("10.209.")) {
+                        LOGGER.info("New client connected from: " + clientAddress);
+                    }
                     
                     executorService.execute(new ClientHandler(clientSocket));
                 } catch (IOException e) {
@@ -54,7 +59,7 @@ public class TCPServer {
         @Override
         public void run() {
             try {
-                LOGGER.info("Client handler started for: " + clientSocket.getInetAddress().getHostAddress());
+                String clientAddress = clientSocket.getInetAddress().getHostAddress();
                 
                 BufferedReader reader = new BufferedReader(
                     new InputStreamReader(clientSocket.getInputStream()));
@@ -64,9 +69,20 @@ public class TCPServer {
                 // Read the first line
                 String firstLine = reader.readLine();
                 if (firstLine == null || firstLine.trim().isEmpty()) {
-                    LOGGER.warning("Received empty request");
-                    sendHttpResponse(writer, "Empty request");
+                    synchronized(TCPServer.class) {
+                        emptyRequestCount++;
+                        if (emptyRequestCount >= MAX_EMPTY_REQUESTS) {
+                            LOGGER.warning("Received multiple empty requests. This might be a health check.");
+                            emptyRequestCount = 0;
+                        }
+                    }
+                    sendHttpResponse(writer, "OK");
                     return;
+                }
+
+                // Reset empty request counter when we get a valid request
+                synchronized(TCPServer.class) {
+                    emptyRequestCount = 0;
                 }
 
                 // Check if it's an HTTP request
@@ -78,7 +94,9 @@ public class TCPServer {
                 }
 
                 clientSocket.close();
-                LOGGER.info("Client connection closed: " + clientSocket.getInetAddress().getHostAddress());
+                if (!clientAddress.startsWith("10.209.")) {
+                    LOGGER.info("Client connection closed: " + clientAddress);
+                }
             } catch (IOException e) {
                 LOGGER.log(Level.SEVERE, "Error handling client: " + e.getMessage(), e);
             }
@@ -90,7 +108,6 @@ public class TCPServer {
             StringBuilder headers = new StringBuilder();
             while ((line = reader.readLine()) != null && !line.isEmpty()) {
                 headers.append(line).append("\n");
-                LOGGER.info("Received from client: " + line);
             }
 
             // Check if it's a health check request
@@ -144,14 +161,16 @@ public class TCPServer {
                         } else {
                             // Người dùng đang nhập dữ liệu cho bài đã chọn
                             String result = processFunction(currentFunction, line.trim());
-                            writer.println(result + "\n");
+                            writer.println(result);
+                            writer.println(); // Add empty line to mark end of result
                             currentFunction = 0;
                             sendMenu(writer);
                             writer.flush();
                         }
                         line = reader.readLine();
                     } catch (Exception e) {
-                        writer.println("Có lỗi xảy ra: " + e.getMessage() + "\nVui lòng thử lại:\n");
+                        writer.println("Có lỗi xảy ra: " + e.getMessage());
+                        writer.println(); // Add empty line to mark end of error
                         currentFunction = 0;
                         sendMenu(writer);
                         writer.flush();
@@ -161,6 +180,7 @@ public class TCPServer {
             } catch (Exception e) {
                 LOGGER.log(Level.SEVERE, "Error processing TCP message", e);
                 writer.println("Lỗi xử lý: " + e.getMessage());
+                writer.println(); // Add empty line to mark end of error
                 writer.flush();
             }
         }
@@ -176,6 +196,7 @@ public class TCPServer {
             menu.append("6. Phân tích chuỗi\n\n");
             menu.append("Vui lòng chọn chức năng (1-6):\n");
             out.println(menu.toString());
+            out.flush();
         }
 
         private String getPromptForFunction(int function) {
