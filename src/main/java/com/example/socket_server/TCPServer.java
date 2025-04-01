@@ -1,5 +1,10 @@
 package com.example.socket_server;
 
+import com.example.socket_server.exercises.NumberChecking;
+import com.example.socket_server.exercises.DigitOperations;
+import com.example.socket_server.exercises.GcdLcm;
+import com.example.socket_server.exercises.StringManipulation;
+
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -98,110 +103,110 @@ public class TCPServer {
         private void handleTcpMessage(String firstLine, BufferedReader reader, PrintWriter writer) throws IOException {
             LOGGER.info("Received from client: " + firstLine);
             
-            // Process TCP message
-            String[] parts = firstLine.split("\\|");
-            if (parts.length != 2) {
-                String errorMsg = "Lỗi: Định dạng không hợp lệ. Sử dụng: function|data";
-                LOGGER.warning(errorMsg);
-                writer.println(errorMsg);
+            try {
+                int currentFunction = 0;
+                sendMenu(writer);
+
+                String line = firstLine;
+                while (line != null) {
+                    try {
+                        if (currentFunction == 0) {
+                            // Người dùng đang chọn bài
+                            currentFunction = Integer.parseInt(line.trim());
+                            if (currentFunction >= 1 && currentFunction <= 6) {
+                                writer.println(getPromptForFunction(currentFunction));
+                                writer.flush();
+                            } else {
+                                currentFunction = 0;
+                                writer.println("Lựa chọn không hợp lệ. Vui lòng chọn lại:\n");
+                                sendMenu(writer);
+                                writer.flush();
+                            }
+                        } else {
+                            // Người dùng đang nhập dữ liệu cho bài đã chọn
+                            String result = processFunction(currentFunction, line.trim());
+                            writer.println(result + "\n");
+                            currentFunction = 0;
+                            sendMenu(writer);
+                            writer.flush();
+                        }
+                        line = reader.readLine();
+                    } catch (Exception e) {
+                        writer.println("Có lỗi xảy ra: " + e.getMessage() + "\nVui lòng thử lại:\n");
+                        currentFunction = 0;
+                        sendMenu(writer);
+                        writer.flush();
+                        line = reader.readLine();
+                    }
+                }
+            } catch (Exception e) {
+                LOGGER.log(Level.SEVERE, "Error processing TCP message", e);
+                writer.println("Lỗi xử lý: " + e.getMessage());
                 writer.flush();
-                return;
             }
-
-            String function = parts[0];
-            String data = parts[1];
-            String response = processRequest(function, data);
-            
-            LOGGER.info("Sending response: " + response);
-            writer.println(response);
-            writer.flush();
         }
 
-        private String processRequest(String function, String data) {
+        private void sendMenu(PrintWriter out) {
+            StringBuilder menu = new StringBuilder();
+            menu.append("MENU CHỨC NĂNG:\n\n");
+            menu.append("1. Kiểm tra số (số nguyên tố, chính phương, hoàn hảo, Armstrong)\n");
+            menu.append("2. Tính tổng và tích các chữ số\n");
+            menu.append("3. Tìm UCLN và BCNN\n");
+            menu.append("4. Đảo ngược chuỗi\n");
+            menu.append("5. Xử lý chuỗi nâng cao\n");
+            menu.append("6. Phân tích chuỗi\n\n");
+            menu.append("Vui lòng chọn chức năng (1-6):\n");
+            out.println(menu.toString());
+        }
+
+        private String getPromptForFunction(int function) {
             switch (function) {
-                case "login":
-                    return handleLogin(data);
-                case "register":
-                    return handleRegister(data);
-                case "getUserInfo":
-                    return handleGetUserInfo(data);
-                case "updateUserInfo":
-                    return handleUpdateUserInfo(data);
-                case "getAllUsers":
-                    return handleGetAllUsers();
-                case "deleteUser":
-                    return handleDeleteUser(data);
+                case 1:
+                    return "Nhập một số nguyên để kiểm tra:\n";
+                case 2:
+                    return "Nhập một số nguyên để tính tổng và tích các chữ số:\n";
+                case 3:
+                    return "Nhập hai số nguyên cách nhau bởi dấu cách để tìm UCLN và BCNN:\n";
+                case 4:
+                case 5:
+                case 6:
+                    return "Nhập chuỗi cần xử lý:\n";
                 default:
-                    return "Lỗi: Chức năng không tồn tại";
+                    return "Lựa chọn không hợp lệ\n";
             }
         }
 
-        private String handleLogin(String data) {
+        private String processFunction(int function, String data) {
             try {
-                String[] parts = data.split(",");
-                if (parts.length != 2) {
-                    return "Lỗi: Định dạng dữ liệu không hợp lệ";
+                switch (function) {
+                    case 1: {
+                        int number = Integer.parseInt(data);
+                        return NumberChecking.checkNumber(number);
+                    }
+                    case 2: {
+                        int number = Integer.parseInt(data);
+                        return DigitOperations.calculateDigits(number);
+                    }
+                    case 3: {
+                        String[] parts = data.split("\\s+");
+                        if (parts.length != 2) {
+                            throw new IllegalArgumentException("Vui lòng nhập đúng hai số nguyên cách nhau bởi dấu cách");
+                        }
+                        int a = Integer.parseInt(parts[0]);
+                        int b = Integer.parseInt(parts[1]);
+                        return GcdLcm.calculate(a, b);
+                    }
+                    case 4:
+                        return StringManipulation.reverseString(data);
+                    case 5:
+                        return StringManipulation.AdvancedOperations.processString(data);
+                    case 6:
+                        return StringManipulation.Analysis.analyzeString(data);
+                    default:
+                        return "Lựa chọn không hợp lệ\n";
                 }
-                String username = parts[0];
-                String password = parts[1];
-                
-                // TODO: Implement actual login logic
-                return "Đăng nhập thành công";
-            } catch (Exception e) {
-                return "Lỗi: " + e.getMessage();
-            }
-        }
-
-        private String handleRegister(String data) {
-            try {
-                String[] parts = data.split(",");
-                if (parts.length != 3) {
-                    return "Lỗi: Định dạng dữ liệu không hợp lệ";
-                }
-                String username = parts[0];
-                String password = parts[1];
-                String email = parts[2];
-                
-                // TODO: Implement actual registration logic
-                return "Đăng ký thành công";
-            } catch (Exception e) {
-                return "Lỗi: " + e.getMessage();
-            }
-        }
-
-        private String handleGetUserInfo(String data) {
-            try {
-                // TODO: Implement actual user info retrieval logic
-                return "Thông tin người dùng";
-            } catch (Exception e) {
-                return "Lỗi: " + e.getMessage();
-            }
-        }
-
-        private String handleUpdateUserInfo(String data) {
-            try {
-                // TODO: Implement actual user info update logic
-                return "Cập nhật thông tin thành công";
-            } catch (Exception e) {
-                return "Lỗi: " + e.getMessage();
-            }
-        }
-
-        private String handleGetAllUsers() {
-            try {
-                // TODO: Implement actual user list retrieval logic
-                return "Danh sách người dùng";
-            } catch (Exception e) {
-                return "Lỗi: " + e.getMessage();
-            }
-        }
-
-        private String handleDeleteUser(String data) {
-            try {
-                // TODO: Implement actual user deletion logic
-                return "Xóa người dùng thành công";
-            } catch (Exception e) {
-                return "Lỗi: " + e.getMessage();
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("Vui lòng nhập số nguyên hợp lệ");
             }
         }
     }
