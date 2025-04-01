@@ -87,12 +87,23 @@ public class TCPServer {
         private void handleHttpRequest(BufferedReader reader, PrintWriter writer) throws IOException {
             // Read all HTTP headers
             String line;
+            StringBuilder headers = new StringBuilder();
             while ((line = reader.readLine()) != null && !line.isEmpty()) {
+                headers.append(line).append("\n");
                 LOGGER.info("Received from client: " + line);
             }
 
-            // Send HTTP response
-            sendHttpResponse(writer, "OK");
+            // Check if it's a health check request
+            if (headers.toString().contains("User-Agent: Go-http-client/2.0")) {
+                sendHttpResponse(writer, "OK");
+                return;
+            }
+
+            // For other HTTP requests, send a more informative response
+            String response = "TCP Server is running\n";
+            response += "Server Time: " + new java.util.Date() + "\n";
+            response += "Server Status: OK\n";
+            sendHttpResponse(writer, response);
         }
 
         private void sendHttpResponse(PrintWriter writer, String body) {
@@ -100,6 +111,9 @@ public class TCPServer {
             writer.println("Content-Type: text/plain");
             writer.println("Content-Length: " + body.length());
             writer.println("Connection: close");
+            writer.println("Cache-Control: no-cache, no-store, must-revalidate");
+            writer.println("Pragma: no-cache");
+            writer.println("Expires: 0");
             writer.println();
             writer.println(body);
             writer.flush();
