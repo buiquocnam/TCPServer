@@ -16,7 +16,7 @@ FROM openjdk:17-slim
 WORKDIR /app
 
 # Copy the built JAR file
-COPY --from=build /app/target/socket-server-0.0.1-SNAPSHOT-jar-with-dependencies.jar app.jar
+COPY --from=build /app/target/socket-server-0.0.1-SNAPSHOT.jar app.jar
 
 # Set environment variables
 ENV PORT=8080
