@@ -21,12 +21,13 @@ public class TCPServer {
     private static int emptyRequestCount = 0;
 
     public static void main(String[] args) {
+        ServerSocket serverSocket = null;
         try {
             LOGGER.info("Starting TCP Server...");
             LOGGER.info("Server address: 0.0.0.0");
             LOGGER.info("Server listening on port: " + PORT);
             
-            ServerSocket serverSocket = new ServerSocket(PORT);
+            serverSocket = new ServerSocket(PORT);
             LOGGER.info("Server socket created successfully");
             
             while (true) {
@@ -41,11 +42,21 @@ public class TCPServer {
                     
                     executorService.execute(new ClientHandler(clientSocket));
                 } catch (IOException e) {
-                    LOGGER.log(Level.SEVERE, "Error accepting client connection", e);
+                    if (!serverSocket.isClosed()) {
+                        LOGGER.log(Level.SEVERE, "Error accepting client connection", e);
+                    }
                 }
             }
         } catch (IOException e) {
             LOGGER.log(Level.SEVERE, "Server error", e);
+        } finally {
+            if (serverSocket != null && !serverSocket.isClosed()) {
+                try {
+                    serverSocket.close();
+                } catch (IOException e) {
+                    LOGGER.log(Level.SEVERE, "Error closing server socket", e);
+                }
+            }
         }
     }
 
@@ -58,13 +69,18 @@ public class TCPServer {
 
         @Override
         public void run() {
+            BufferedReader reader = null;
+            PrintWriter writer = null;
             try {
                 String clientAddress = clientSocket.getInetAddress().getHostAddress();
                 
-                BufferedReader reader = new BufferedReader(
+                reader = new BufferedReader(
                     new InputStreamReader(clientSocket.getInputStream()));
-                PrintWriter writer = new PrintWriter(
+                writer = new PrintWriter(
                     new OutputStreamWriter(clientSocket.getOutputStream()), true);
+
+                // Set socket timeout
+                clientSocket.setSoTimeout(30000); // 30 seconds timeout
 
                 // Send welcome message and menu immediately
                 writer.println("Chào mừng đến với TCP Server!");
@@ -99,12 +115,24 @@ public class TCPServer {
                     handleTcpMessage(firstLine, reader, writer);
                 }
 
-                clientSocket.close();
-                if (!clientAddress.startsWith("10.209.")) {
-                    LOGGER.info("Client connection closed: " + clientAddress);
-                }
             } catch (IOException e) {
-                LOGGER.log(Level.SEVERE, "Error handling client: " + e.getMessage(), e);
+                if (!clientSocket.isClosed()) {
+                    LOGGER.log(Level.SEVERE, "Error handling client: " + e.getMessage(), e);
+                }
+            } finally {
+                // Close resources
+                try {
+                    if (writer != null) writer.close();
+                    if (reader != null) reader.close();
+                    if (!clientSocket.isClosed()) {
+                        clientSocket.close();
+                        if (!clientAddress.startsWith("10.209.")) {
+                            LOGGER.info("Client connection closed: " + clientAddress);
+                        }
+                    }
+                } catch (IOException e) {
+                    LOGGER.log(Level.SEVERE, "Error closing client resources", e);
+                }
             }
         }
 

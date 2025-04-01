@@ -7,7 +7,7 @@ import java.util.Scanner;
 public class TCPClient {
     private static final String SERVER_HOST = "tcpserver-adpb.onrender.com";
     private static final int SERVER_PORT = 10000;
-    private static final int TIMEOUT = 30000; // Increased timeout to 30 seconds
+    private static final int TIMEOUT = 30000; // 30 seconds timeout
 
     public static void main(String[] args) {
         Socket socket = null;
@@ -124,10 +124,15 @@ public class TCPClient {
             // Đóng các tài nguyên
             try {
                 if (scanner != null) scanner.close();
-                if (writer != null) writer.close();
+                if (writer != null) {
+                    writer.flush();
+                    writer.close();
+                }
                 if (reader != null) reader.close();
-                if (socket != null) socket.close();
-                System.out.println("Đã đóng kết nối!");
+                if (socket != null && !socket.isClosed()) {
+                    socket.close();
+                    System.out.println("Đã đóng kết nối!");
+                }
             } catch (IOException e) {
                 System.out.println("Lỗi khi đóng kết nối: " + e.getMessage());
             }
