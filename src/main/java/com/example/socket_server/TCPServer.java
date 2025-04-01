@@ -61,16 +61,16 @@ public class TCPServer {
                 PrintWriter writer = new PrintWriter(
                     new OutputStreamWriter(clientSocket.getOutputStream()), true);
 
-                // Read the first line to determine if it's an HTTP request
+                // Read the first line
                 String firstLine = reader.readLine();
-                if (firstLine == null) {
+                if (firstLine == null || firstLine.trim().isEmpty()) {
                     LOGGER.warning("Received empty request");
+                    sendHttpResponse(writer, "Empty request");
                     return;
                 }
 
                 // Check if it's an HTTP request
                 if (firstLine.startsWith("GET ") || firstLine.startsWith("HEAD ")) {
-                    // Handle HTTP health check
                     handleHttpRequest(reader, writer);
                 } else {
                     // Handle TCP message
@@ -91,12 +91,17 @@ public class TCPServer {
                 LOGGER.info("Received from client: " + line);
             }
 
-            // Send HTTP response for health check
+            // Send HTTP response
+            sendHttpResponse(writer, "OK");
+        }
+
+        private void sendHttpResponse(PrintWriter writer, String body) {
             writer.println("HTTP/1.1 200 OK");
             writer.println("Content-Type: text/plain");
-            writer.println("Content-Length: 2");
+            writer.println("Content-Length: " + body.length());
+            writer.println("Connection: close");
             writer.println();
-            writer.println("OK");
+            writer.println(body);
             writer.flush();
         }
 
@@ -108,7 +113,7 @@ public class TCPServer {
                 sendMenu(writer);
 
                 String line = firstLine;
-                while (line != null) {
+                while (line != null && !line.trim().isEmpty()) {
                     try {
                         if (currentFunction == 0) {
                             // Người dùng đang chọn bài
