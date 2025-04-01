@@ -18,13 +18,8 @@ WORKDIR /app
 # Copy the built JAR file
 COPY --from=build /app/target/socket-server-0.0.1-SNAPSHOT-jar-with-dependencies.jar app.jar
 
-# Create and copy public directory
-RUN mkdir -p /app/public
-COPY --from=build /app/src/main/public /app/public
-
 # Set environment variables
 ENV PORT=8080
-ENV PUBLIC_PATH=/app/public
 
 # Expose the port
 EXPOSE 8080
