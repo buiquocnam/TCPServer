@@ -16,20 +16,35 @@ public class TCPServer {
     private static final ExecutorService executorService = Executors.newCachedThreadPool();
 
     public static void main(String[] args) {
-        try (ServerSocket serverSocket = new ServerSocket(PORT)) {
-            System.out.println("TCP Server đang chạy trên port: " + PORT);
-            System.out.println("Địa chỉ server: " + serverSocket.getInetAddress().getHostAddress());
+        try {
+            // In thông tin môi trường
+            System.out.println("Starting TCP Server...");
+            System.out.println("PORT: " + PORT);
+            System.out.println("JAVA_HOME: " + System.getenv("JAVA_HOME"));
+            System.out.println("PWD: " + System.getenv("PWD"));
+            
+            // Tạo server socket với backlog
+            ServerSocket serverSocket = new ServerSocket(PORT, 50);
+            System.out.println("Server socket created successfully");
+            System.out.println("Server listening on port: " + PORT);
+            System.out.println("Server address: " + serverSocket.getInetAddress().getHostAddress());
 
             while (true) {
-                Socket clientSocket = serverSocket.accept();
-                System.out.println("Client mới kết nối từ: " + clientSocket.getInetAddress().getHostAddress());
-                
-                // Xử lý client trong thread riêng
-                executorService.execute(new ClientHandler(clientSocket));
+                try {
+                    System.out.println("Waiting for client connection...");
+                    Socket clientSocket = serverSocket.accept();
+                    System.out.println("New client connected from: " + clientSocket.getInetAddress().getHostAddress());
+                    
+                    executorService.execute(new ClientHandler(clientSocket));
+                } catch (IOException e) {
+                    System.err.println("Error accepting client connection: " + e.getMessage());
+                    e.printStackTrace();
+                }
             }
         } catch (IOException e) {
-            System.err.println("Lỗi server: " + e.getMessage());
+            System.err.println("Fatal server error: " + e.getMessage());
             e.printStackTrace();
+            System.exit(1);
         }
     }
 
@@ -46,19 +61,24 @@ public class TCPServer {
                 BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
                 PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true)
             ) {
+                System.out.println("Client handler started for: " + clientSocket.getInetAddress().getHostAddress());
+                
                 String inputLine;
                 while ((inputLine = in.readLine()) != null) {
-                    // Xử lý dữ liệu từ client
+                    System.out.println("Received from client: " + inputLine);
                     String response = processInput(inputLine);
+                    System.out.println("Sending response: " + response);
                     out.println(response);
                 }
             } catch (IOException e) {
-                System.err.println("Lỗi xử lý client: " + e.getMessage());
+                System.err.println("Error handling client: " + e.getMessage());
                 e.printStackTrace();
             } finally {
                 try {
                     clientSocket.close();
+                    System.out.println("Client connection closed: " + clientSocket.getInetAddress().getHostAddress());
                 } catch (IOException e) {
+                    System.err.println("Error closing client socket: " + e.getMessage());
                     e.printStackTrace();
                 }
             }
@@ -66,7 +86,6 @@ public class TCPServer {
 
         private String processInput(String input) {
             try {
-                // Phân tích input để xác định chức năng và dữ liệu
                 String[] parts = input.split("\\|");
                 if (parts.length < 2) {
                     return "Lỗi: Định dạng không hợp lệ. Sử dụng: function|data";

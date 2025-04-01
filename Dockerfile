@@ -20,9 +20,10 @@ COPY --from=build /app/target/socket-server-0.0.1-SNAPSHOT-jar-with-dependencies
 
 # Set environment variables
 ENV PORT=8080
+ENV JAVA_OPTS="-Xmx512m -Xms256m"
 
 # Expose the port
 EXPOSE 8080
 
-# Run the application
-CMD ["java", "-jar", "app.jar"]
+# Run the application with proper signal handling
+CMD ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

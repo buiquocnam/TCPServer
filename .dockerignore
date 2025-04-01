@@ -9,3 +9,6 @@ target/
 .idea/
 .vscode/
 *.iml
+src/main/public/
+src/main/resources/
+src/test/
